@@ -3173,6 +3173,8 @@ class EventGroup(EventContainer):
 		"startJd",
 		"endJd",
 		"remoteIds",
+		"remoteSyncEnable",
+		"remoteSyncDuration",
 		"remoteSyncData",
 		#"eventIdByRemoteIds",
 		"deletedRemoteEvents",
@@ -3198,6 +3200,8 @@ class EventGroup(EventContainer):
 		"startJd",
 		"endJd",
 		"remoteIds",
+		"remoteSyncEnable",
+		"remoteSyncDuration",
 		"remoteSyncData",
 		#"eventIdByRemoteIds",
 		"deletedRemoteEvents",
@@ -3205,6 +3209,8 @@ class EventGroup(EventContainer):
 	)
 	importExportExclude = (
 		"remoteIds",
+		"remoteSyncEnable",
+		"remoteSyncDuration",
 		"remoteSyncData",
 		#"eventIdByRemoteIds",
 		"deletedRemoteEvents",
@@ -3375,6 +3381,9 @@ class EventGroup(EventContainer):
 		self.remoteIds = None## (accountId, groupId)
 		# remote groupId can be an integer or string,
 		# depending on remote account type
+		self.remoteSyncEnable = False
+		self.remoteSyncDuration = (1, 3600)
+		# remoteSyncDuration (value, unit) where value and unit are both ints
 		self.remoteSyncData = {}
 		#self.eventIdByRemoteIds = {}
 		self.deletedRemoteEvents = {}
@@ -3383,6 +3392,13 @@ class EventGroup(EventContainer):
 		if self.id is None:
 			self.setId()
 		EventContainer.save(self)
+
+	def getSyncDurationSec(self):
+		"""
+		return Sync Duration in seconds (int)
+		"""
+		value, unit = self.remoteSyncDuration
+		return value * unit
 
 	def afterSync(self):
 		self.remoteSyncData[self.remoteIds] = now()
