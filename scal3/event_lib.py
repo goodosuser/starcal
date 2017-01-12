@@ -4869,6 +4869,11 @@ class EventAccountsHolder(JsonObjectsHolder):
 	file = join(confDir, 'event', 'account_list.json')
 	childName = 'account'
 
+	def __init__(self, _id=None):
+		JsonObjectsHolder.__init__(self)
+		self.id = None
+		self.parent = None
+
 	def loadClass(self, name):
 		try:
 			return classes.account.byName[name]
@@ -5023,20 +5028,21 @@ class DummyAccount:
 
 # Should not be registered, or instantiate directly
 @classes.account.setMain
-class Account(BsonHistObj):
+class Account(BsonHistEventObj):
 	loaded = True
 	name = ''
 	desc = ''
 	basicParams = (  # FIXME
-		'enable',
+		#'enable',
+		'type',
 	)
 	params = (
-		'enable',
+		#'enable',
 		'title',
 		'remoteGroups',
 	)
 	paramsOrder = (
-		'enable',
+		#'enable',
 		'type',
 		'title',
 		'remoteGroups',
@@ -5049,6 +5055,9 @@ class Account(BsonHistObj):
 	@classmethod
 	def getSubclass(cls, _type):
 		return classes.account.byName[_type]
+
+	def __bool__(self):
+		return True
 
 	def __init__(self, _id=None):
 		if _id is None:
@@ -5064,7 +5073,7 @@ class Account(BsonHistObj):
 	def save(self):
 		if self.id is None:
 			self.setId()
-		BsonHistObj.save(self)
+		BsonHistEventObj.save(self)
 
 	def setId(self, _id=None):
 		if _id is None or _id < 0:
@@ -5088,7 +5097,7 @@ class Account(BsonHistObj):
 		raise NotImplementedError
 
 	def getData(self):
-		data = BsonHistObj.getData(self)
+		data = BsonHistEventObj.getData(self)
 		data['type'] = self.name
 		return data
 
