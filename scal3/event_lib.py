@@ -532,7 +532,7 @@ class MultiValueAllDayEventRule(AllDayEventRule):
 		return _(v)
 
 	def __str__(self):
-		return textNumEncode(numRangesEncode(self.values))
+		return textNumEncode(numRangesEncode(self.values, ", "))
 
 	def hasValue(self, value):
 		for item in self.values:
