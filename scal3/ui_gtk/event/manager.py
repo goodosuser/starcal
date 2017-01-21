@@ -610,7 +610,10 @@ class EventManagerDialog(gtk.Dialog, MyDialog, ud.BaseCalObj):## FIXME
 					path,
 				)
 				menu.add(dupAllItem)
-				dupAllItem.set_sensitive(not event_lib.allReadOnly and bool(group.idList))
+				dupAllItem.set_sensitive(
+					not group.isReadOnly()
+					and bool(group.idList)
+				)
 				###
 				menu.add(gtk.SeparatorMenuItem())
 				menu.add(eventWriteMenuItem(
@@ -648,7 +651,10 @@ class EventManagerDialog(gtk.Dialog, MyDialog, ud.BaseCalObj):## FIXME
 					path,
 				)
 				menu.add(sortItem)
-				sortItem.set_sensitive(not event_lib.allReadOnly and bool(group.idList))
+				sortItem.set_sensitive(
+					not group.isReadOnly()
+					and bool(group.idList)
+				)
 				###
 				convertItem = labelStockMenuItem(
 					_("Convert Calendar Type"),
@@ -657,7 +663,10 @@ class EventManagerDialog(gtk.Dialog, MyDialog, ud.BaseCalObj):## FIXME
 					group,
 				)
 				menu.add(convertItem)
-				convertItem.set_sensitive(not event_lib.allReadOnly and bool(group.idList))
+				convertItem.set_sensitive(
+					not group.isReadOnly()
+					and bool(group.idList)
+				)
 				###
 				for newGroupType in group.canConvertTo:
 					menu.add(eventWriteMenuItem(
@@ -678,7 +687,10 @@ class EventManagerDialog(gtk.Dialog, MyDialog, ud.BaseCalObj):## FIXME
 					path,
 				)
 				menu.add(bulkItem)
-				bulkItem.set_sensitive(not event_lib.allReadOnly and bool(group.idList))
+				bulkItem.set_sensitive(
+					not group.isReadOnly()
+					and bool(group.idList)
+				)
 				###
 				for actionName, actionFuncName in group.actions:
 					menu.add(eventWriteMenuItem(
@@ -1135,9 +1147,14 @@ class EventManagerDialog(gtk.Dialog, MyDialog, ud.BaseCalObj):## FIXME
 
 	def editGroupByPath(self, path):
 		from scal3.ui_gtk.event.group.editor import GroupEditorDialog
+		checkEventsReadOnly()  # FIXME
 		group, = self.getObjsByPath(path)
 		if group.name == "trash":
 			self.editTrash()
+		elif group.isReadOnly():
+			showError(_(
+				"Event group \"%s\" is synchronizing and read-only"
+			) % group.title, parent=self)
 		else:
 			group = GroupEditorDialog(group, parent=self).run()
 			if group is None:
