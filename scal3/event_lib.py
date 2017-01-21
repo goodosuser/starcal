@@ -39,6 +39,7 @@ from scal3.utils import (
 	myRaise,
 	myRaiseTback,
 	toStr,
+	s_join,
 )
 from scal3.os_utils import makeDir
 from scal3.interval_utils import *
@@ -471,6 +472,9 @@ class EventRule(SObj):
 	expand = False
 	params = ()
 
+	def getServerString(self):
+		raise NotImplementedError
+
 	def __bool__(self):
 		return True
 
@@ -565,6 +569,9 @@ class YearEventRule(MultiValueAllDayEventRule):
 	name = "year"
 	desc = _("Year")
 
+	def getServerString(self):
+		return numRangesEncode(self.values, " ")  # no comma
+
 	def __init__(self, parent):
 		MultiValueAllDayEventRule.__init__(self, parent)
 		self.values = [getSysDate(self.getMode())[0]]
@@ -602,6 +609,9 @@ class MonthEventRule(MultiValueAllDayEventRule):
 		"weekMonth",
 	)
 
+	def getServerString(self):
+		return numRangesEncode(self.values, " ")  # no comma
+
 	def __init__(self, parent):
 		MultiValueAllDayEventRule.__init__(self, parent)
 		self.values = [1]
@@ -616,6 +626,9 @@ class MonthEventRule(MultiValueAllDayEventRule):
 class DayOfMonthEventRule(MultiValueAllDayEventRule):
 	name = "day"
 	desc = _("Day of Month")
+
+	def getServerString(self):
+		return numRangesEncode(self.values, " ")  # no comma
 
 	def __init__(self, parent):
 		MultiValueAllDayEventRule.__init__(self, parent)
@@ -642,6 +655,9 @@ class WeekNumberModeEventRule(EventRule):
 	EVERY_WEEK, ODD_WEEKS, EVEN_WEEKS = list(range(3))
 	# remove EVERY_WEEK? FIXME
 	weekNumModeNames = ("any", "odd", "even")
+
+	def getServerString(self):
+		return self.weekNumMode
 
 	def __init__(self, parent):
 		EventRule.__init__(self, parent)
@@ -700,6 +716,9 @@ class WeekDayEventRule(AllDayEventRule):
 	params = (
 		"weekDayList",
 	)
+
+	def getServerString(self):
+		return s_join(self.weekDayList)
 
 	def __init__(self, parent):
 		EventRule.__init__(self, parent)
@@ -769,6 +788,13 @@ class WeekMonthEventRule(EventRule):
 		_("Last"),  # 4
 	)
 
+	def getServerString(self):
+		return json.dumps({
+			"weekIndex": self.wmIndex,
+			"weekDay": self.weekDay,
+			"month": self.month,
+		})
+
 	def __init__(self, parent):
 		EventRule.__init__(self, parent)
 		self.month = 1
@@ -827,6 +853,9 @@ class DateEventRule(EventRule):
 	# (and possibly hourList, minuteList, secondList)
 	# also conflict with "holiday" # FIXME
 
+	def getServerString(self):
+		return "%.4d/%.2d/%.2d" % tuple(self.date)
+
 	def __str__(self):
 		return dateEncode(self.date)
 
@@ -868,6 +897,11 @@ class DateAndTimeEventRule(DateEventRule):
 		"date",
 		"time",
 	)
+
+	def getServerString(self):
+		return "%.4d/%.2d/%2d %.2d:%.2d:%.2d" % tuple(
+			self.date + self.time
+		)
 
 	def __init__(self, parent):
 		DateEventRule.__init__(self, parent)
@@ -944,6 +978,9 @@ class DayTimeEventRule(EventRule):  # Moment Event
 		"dayTime",
 	)
 
+	def getServerString(self):
+		return "%.2d:%.2d:%.2d" % tuple(self.dayTime)
+
 	def __init__(self, parent):
 		EventRule.__init__(self, parent)
 		self.dayTime = localtime()[3:6]
@@ -978,6 +1015,11 @@ class DayTimeRangeEventRule(EventRule):
 		"dayTimeStart",
 		"dayTimeEnd",
 	)
+
+	def getServerString(self):
+		return "%.2d:%.2d:%.2d %.2d:%.2d:%.2d" % (
+			self.dayTimeStart + self.dayTimeEnd
+		)
 
 	def __init__(self, parent):
 		EventRule.__init__(self, parent)
@@ -1029,6 +1071,8 @@ class StartEventRule(DateAndTimeEventRule):
 		"date",
 	)
 
+	# def getServerString(self): # in DateAndTimeEventRule
+
 	def calcOccurrence(self, startJd, endJd, event):
 		return IntervalOccurSet.newFromStartEnd(
 			max(self.getEpochFromJd(startJd), self.getEpoch()),
@@ -1044,6 +1088,8 @@ class EndEventRule(DateAndTimeEventRule):
 		"date",
 		"duration",
 	)
+
+	# def getServerString(self): # in DateAndTimeEventRule
 
 	def calcOccurrence(self, startJd, endJd, event):
 		return IntervalOccurSet.newFromStartEnd(
@@ -1069,6 +1115,18 @@ class DurationEventRule(EventRule):
 	)
 	sgroup = 1
 	units = (1, 60, 3600, dayLen, 7 * dayLen)
+
+	def getServerString(self):
+		return "%d %s" % (self.value, self.getUnitSymbol())
+
+	def getUnitSymbol(self):
+		return {
+			1:				"s",
+			60:				"m",
+			3600:			"h",
+			3600 * 24:		"d",
+			3600 * 24 * 7:	"w",
+		}[self.unit]
 
 	def __init__(self, parent):
 		EventRule.__init__(self, parent)
@@ -1143,6 +1201,9 @@ class CycleDaysEventRule(EventRule):
 		"days",
 	)
 
+	def getServerString(self):
+		return "%d" % self.days
+
 	def __init__(self, parent):
 		EventRule.__init__(self, parent)
 		self.days = 7
@@ -1176,6 +1237,9 @@ class CycleWeeksEventRule(EventRule):
 	params = (
 		"weeks",
 	)
+
+	def getServerString(self):
+		return "%d" % self.weeks
 
 	def __init__(self, parent):
 		EventRule.__init__(self, parent)
@@ -1221,6 +1285,15 @@ class CycleLenEventRule(EventRule):
 		"days",
 		"extraTime",
 	)
+
+	def getServerString(self):
+		# "%{days} %H:%M:%S"
+		return "%d %.2d:%.2d:%.2d" % (
+			self.days,
+			self.extraTime[0],
+			self.extraTime[1],
+			self.extraTime[2],
+		)
 
 	def __init__(self, parent):
 		EventRule.__init__(self, parent)
@@ -1303,6 +1376,12 @@ class ExDatesEventRule(EventRule):
 	params = (
 		"dates",
 	)
+
+	def getServerString(self):
+		return " ".join(
+			"%.4d/%.2d/%.2d" % tuple(date)
+			for date in self.dates
+		)
 
 	def __init__(self, parent):
 		EventRule.__init__(self, parent)
@@ -2082,6 +2161,18 @@ class Event(BsonHistEventObj, RuleContainer):
 	def setJdExact(self, jd):
 		return self.setJd(jd)
 
+	def getServerData(self):
+		data = {
+			"summary": self.getSummary(),
+			"description": self.getDescription(),
+			"calType": calTypes.names[self.mode],
+			"icon": self.icon,
+			"timeZone": self.timeZone,
+			"timeZoneEnable": self.timeZoneEnable,
+		}
+		fixIconInData(data)
+		return data
+
 
 class SingleStartEndEvent(Event):
 	isSingleOccur = True
@@ -2139,6 +2230,20 @@ class TaskEvent(SingleStartEndEvent):
 		"duration",
 	)
 	isAllDay = False
+
+	def getServerData(self):
+		try:
+			durationUnit = self["duration"].unit
+		except KeyError:
+			durationUnit = 0
+
+		data = Event.getServerData(self)
+		data.update({
+			"startTime": jsonTimeFromEpoch(self["start"].getEpoch()),
+			"endTime": jsonTimeFromEpoch(self.getEndEpoch()),
+			"durationUnit": durationUnit,
+		})
+		return data
 
 	def setDefaults(self):
 		self.setStart(
@@ -2299,6 +2404,22 @@ class AllDayTaskEvent(SingleStartEndEvent):
 	)
 	isAllDay = True
 
+	def getServerData(self):
+		try:
+			self["duration"]
+		except KeyError:
+			durationEnable = False
+		else:
+			durationEnable = True
+
+		data = Event.getServerData(self)
+		data.update({
+			"startJd": self["start"].getJd(),
+			"endJd": self.getEndJd(),
+			"durationEnable": durationEnable,
+		})
+		return data
+
 	def setJd(self, jd):
 		self.getAddRule("start").setJdExact(jd)
 
@@ -2427,6 +2548,13 @@ class DailyNoteEvent(Event):
 	)
 	isAllDay = True
 
+	def getServerData(self):
+		data = Event.getServerData(self)
+		data.update({
+			"jd": self.getJd(),
+		})
+		return data
+
 	def getDate(self):
 		return self["date"].date
 
@@ -2474,6 +2602,20 @@ class YearlyEvent(Event):
 	supportedRules = requiredRules + ("start",)
 	paramsOrder = Event.paramsOrder + ("startYear", "month", "day")
 	isAllDay = True
+
+	def getServerData(self):
+		data = Event.getServerData(self)
+		data.update({
+			"month": self.getMonth(),
+			"day": self.getDay(),
+		})
+		try:
+			data["startYear"] = int(self["start"].date[0])
+		except KeyError:
+			data["startYearEnable"] = False
+		else:
+			data["startYearEnable"] = True
+		return data
 
 	def getMonth(self):
 		return self["month"].values[0]
@@ -2650,6 +2792,18 @@ class MonthlyEvent(Event):
 	supportedRules = requiredRules
 	isAllDay = False
 
+	def getServerData(self):
+		data = Event.getServerData(self)
+		startSec, endSec = self["dayTimeRange"].getSecondsRange()
+		data.update({
+			"startJd": self["start"].getJd(),
+			"endJd": self["end"].getJd(),
+			"day": self.getDay(),
+			"dayStartSeconds": startSec,
+			"dayEndSeconds": endSec,
+		})
+		return data
+
 	def setJd(self, jd):
 		year, month, day = jd_to(jd, self.mode)
 		self["start"].setDate((year, month, 1))
@@ -2683,6 +2837,18 @@ class WeeklyEvent(Event):
 	supportedRules = requiredRules
 	isAllDay = False
 
+	def getServerData(self):
+		data = Event.getServerData(self)
+		startSec, endSec = self["dayTimeRange"].getSecondsRange()
+		data.update({
+			"startJd": self["start"].getJd(),
+			"endJd": self["end"].getJd(),
+			"cycleWeeks": self["cycleWeeks"].getData(),
+			"dayStartSeconds": startSec,
+			"dayEndSeconds": endSec,
+		})
+		return data
+
 	def setDefaults(self):
 		currentJd = core.getCurrentJd()
 		self["start"].setJd(currentJd)
@@ -2712,6 +2878,18 @@ class UniversityClassEvent(Event):
 		"courseId",
 	)
 	isAllDay = False
+
+	def getServerData(self):
+		data = Event.getServerData(self)
+		startSec, endSec = self["dayTimeRange"].getSecondsRange()
+		data.update({
+			"weekNumMode": self["weekNumMode"].getData(),
+			"weekDayList": self["weekDay"].getData(),
+			"dayStartSeconds": startSec,
+			"dayEndSeconds": endSec,
+			"courseId": self.courseId,
+		})
+		return data
 
 	def __init__(self, _id=None, parent=None):
 		## assert group is not None  # FIXME
@@ -2791,6 +2969,17 @@ class UniversityExamEvent(DailyNoteEvent):
 	)
 	isAllDay = False
 
+	def getServerData(self):
+		data = Event.getServerData(self)
+		startSec, endSec = self["dayTimeRange"].getSecondsRange()
+		data.update({
+			"jd": self.getJd(),
+			"dayStartSeconds": startSec,
+			"dayEndSeconds": endSec,
+			"courseId": self.courseId,
+		})
+		return data
+
 	def __init__(self, _id=None, parent=None):
 		## assert group is not None  # FIXME
 		DailyNoteEvent.__init__(self, _id, parent)
@@ -2858,6 +3047,14 @@ class LifeTimeEvent(SingleStartEndEvent):
 	#def setDefaults(self):
 	#	self["start"].date = ...
 
+	def getServerData(self):
+		data = Event.getServerData(self)
+		data.update({
+			"startJd": self["start"].getJd(),
+			"endJd": self["end"].getJd(),
+		})
+		return data
+
 	def setJd(self, jd):
 		self.getAddRule("start").setJdExact(jd)
 
@@ -2897,6 +3094,16 @@ class LargeScaleEvent(Event):  # or MegaEvent? FIXME
 	def __bool__(self):
 		return True
 	isAllDay = True
+
+	def getServerData(self):
+		data = Event.getServerData(self)
+		data.update({
+			"scale": self.scale,
+			"start": self.start,
+			"end": self.end,
+			"durationEnable": self.endRel,
+		})
+		return data
 
 	def __init__(self, _id=None, parent=None):
 		self.scale = 1  # 1, 1000, 1000**2, 1000**3
@@ -2976,6 +3183,18 @@ class CustomEvent(Event):
 	desc = _("Custom Event")
 	isAllDay = False
 
+	def getServerData(self):
+		data = Event.getServerData(self)
+		data.update({
+			"rules": [
+				{
+					"type": ruleName,
+					"value": rule.getServerString(),
+				}
+				for ruleName, rule in rulesOd.items()
+			],
+		})
+		return data
 
 ###########################################################################
 ###########################################################################
