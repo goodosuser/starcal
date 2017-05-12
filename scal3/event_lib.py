@@ -1750,6 +1750,7 @@ class Event(BsonHistEventObj, RuleContainer):
 	basicParams = (
 		#"modified",
 		"remoteIds",
+		"lastMergeSha1", # [localSha1, remoteSha1]
 		"notifiers",  # FIXME
 	)
 	params = RuleContainer.params + (
@@ -1766,6 +1767,7 @@ class Event(BsonHistEventObj, RuleContainer):
 		"notifiers",
 		"notifyBefore",
 		"remoteIds",
+		"lastMergeSha1",
 		"modified",
 	)
 
@@ -1830,6 +1832,7 @@ class Event(BsonHistEventObj, RuleContainer):
 		self.remoteIds = None  # (accountId, groupId, eventId) OR (accountId, groupId, eventId, sha1)
 		# remote groupId and eventId both can be integer or string
 		# (depending on remote account type)
+		self.lastMergeSha1 = None # [localSha1, remoteSha1]
 
 	def getShownDescription(self):
 		if not self.description:
