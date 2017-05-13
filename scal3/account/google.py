@@ -424,6 +424,13 @@ class GoogleAccount(Account):
 		service = self.getCalendarService()
 		if not service:
 			return "no service"  # fix msg FIXME
+
+		eventIdByRemote = {
+			event.id: event.remoteIds[2]
+			for event in group
+			if event.remoteIds[0] == self.id
+		}
+
 		lastSync = group.getLastSync()
 		funcStartTime = now()
 		# _________________ Pull _________________
@@ -463,14 +470,21 @@ class GoogleAccount(Account):
 			except KeyError:
 				diff[key] = [value]
 
+		def getLocalEventId(gevent):
+			try:
+				return gevent["extendedProperties"]["shared"]["starcal_id"]
+			except KeyError:
+				pass
+			try:
+				return eventIdByRemote[gevent["id"]]
+			except KeyError:
+				pass
+			return None
+
 		for gevent in gevents:
 			remoteIds = (self.id, remoteGroupId, gevent["id"])
 
-			try:
-				#eventId = group.eventIdByRemoteIds[remoteIds]
-				eventId = gevent["extendedProperties"]["shared"]["starcal_id"]
-			except KeyError:
-				eventId = None
+			eventId = getLocalEventId(gevent)
 
 			bothId = (eventId, gevent["id"])
 			if gevent["status"] == "cancelled":
@@ -583,8 +597,6 @@ class GoogleAccount(Account):
 				print("----------- event %s added on server"%event.summary)
 			event.remoteIds = [self.id, remoteGroupId, remoteEventId]
 			event.save()
-			#group.eventIdByRemoteIds[tuple(event.remoteIds)] = event.id
-			# use tuple() to avoid: TypeError: unhashable type: "list"
 		"""
 		group.afterSync()  # FIXME
 		group.save()  # FIXME

@@ -292,6 +292,54 @@ class StarCalendarAccount(Account):
 	def deleteGroup(self, remoteGroupId):
 		pass
 
+	def _pullNewEvent(self, group, remoteEvent): # returns error(str)
+		remoteEvent, error = self.call(
+			"get",
+			"event/%s/%s/" % (remoteEvent["eventType"], remoteEvent["eventId"]),
+		)
+		if error:
+			return error
+		# remoteEvent is a dict
+		# pprint(remoteEvent)
+		event, error = decodeRemoteEvent(
+			remoteEvent,
+			self.id,
+			group,
+		)
+		if error:
+			return error
+
+		record = event.save() # record is (lastEpoch, lastHash, **args)
+		event.lastMergeSha1 = [
+			record[1], # local sha1
+			event.remoteIds[1], # remote sha1
+		]
+		event.afterModify()
+		event.save()
+		group.append(event)
+		return ""
+
+	def _sendMergeEvent(event, remoteEvent):
+		if not event.lastMergeSha1:
+			return "event %r has no 'lastMergeSha1'" % event.id # FIXME: what else can we do?
+
+		_, remoteSha1 = event.lastMergeSha1
+		basicData = self.loadBasicData()
+		try:
+			paramsMtime = basicData["paramsMtime"]
+		except KeyError:
+			return "event %r has no 'paramsMtime'" % event.id # FIXME: what else can we do?
+		data, error = self.call(
+			"post",
+			"event/%s/%s/merge" % (remoteEvent["eventType"], remoteEvent["eventId"]),
+			event=remoteEvent,
+			lastMergeSha1=remoteSha1,
+			fieldsMtime=paramsMtime,
+		)
+		if error:
+			return error
+
+
 	def sync(self, group, remoteGroupId):  # in progress TODO
 		"""
 		return None if successful, or error string if failed
@@ -302,6 +350,13 @@ class StarCalendarAccount(Account):
 		if group.remoteIds[0] != self.id:
 			return "mismatch account id"
 		groupId = group.remoteIds[1]
+
+		eventIdByRemote = {
+			event.id: event.remoteIds[2]
+			for event in group
+			if event.remoteIds[0] == self.id
+		}
+
 		lastSyncTuple = group.getLastSync()
 		if lastSyncTuple is None:
 			lastSyncStartEpoch = group.getStartEpoch()
@@ -311,42 +366,43 @@ class StarCalendarAccount(Account):
 
 		syncStart = datetime.now()
 
-		path = "event/groups/%s/modified-events/%s/" % (
-			groupId,
-			jsonTimeFromEpoch(lastSyncStartEpoch),
+		data, error = self.call(
+			"get",
+			"event/groups/%s/events-sha1/" % groupId,
 		)
-		data, error = self.call("get", path)
 		if error:
 			return error
+
 		try:
-			remoteModifiedEvents = data["modifiedEvents"]
+			remoteEvents = data["events"]
 		except KeyError:
-			return "bad data: missing \"modifiedEvents\""
+			return "bad data: missing \"events\""
+
 		try:
 			group.setReadOnly(True)
-
 			### Pull
-			for remoteEvent in remoteModifiedEvents:
-				# remoteEvent is a dict
-				pprint(remoteEvent)
-				event, error = decodeRemoteEvent(
-					remoteEvent,
-					self.id,
-					group,
-				)
-				if error:
-					print(error)
-					continue
-				# record = event.save() # record is (lastEpoch, lastHash, **args)
-				# event.lastMergeSha1 = [
-				# 	record[1], # local sha1
-				# 	event.remoteIds[1], # remote sha1
-				# ]
-				# group.replaceEvent(event)
+			for remoteEvent in remoteEvents:
+				# remoteEvent is a dict with 3 keys only: "eventId", "eventType", and "lastSha1"
+				remoteEventId = remoteEvent["eventId"]
+				# remoteEventLastSha1 = remoteEvent["lastSha1"]
 
-			### Push
-			if lastSyncEndEpoch:
-				pass
+				try:
+					eventId = eventIdByRemote[remoteEventId]
+				except KeyError:
+					error = self._pullNewEvent(group, remoteEvent)
+					if error:
+						return error
+					continue
+
+				event = group.getEvent(eventId)
+
+				error = self._sendMergeEvent(event, remoteEvent)
+				if error:
+					return error
+
+		# 	### Push
+		# 	if lastSyncEndEpoch:
+		# 		pass
 
 		except Exception as e:
 			myRaise()

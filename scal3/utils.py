@@ -57,6 +57,21 @@ def toStr(s):
 def cmp(a, b):
 	return 0 if a == b else (1 if a > b else -1)
 
+def jsonifyData(data): # or listify :D
+	"""
+	converts tuples into lists
+	"""
+	if isinstance(data, dict):
+		return {
+			key: jsonifyData(value)
+			for key, value in data.items()
+		}
+	elif isinstance(data, (list, tuple)):
+		return [
+			jsonifyData(item)
+			for item in data
+		]
+	return data
 
 def versionLessThan(v0, v1):
 	if v0 == "":
