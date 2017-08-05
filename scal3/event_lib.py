@@ -1116,6 +1116,18 @@ class DurationEventRule(EventRule):
 	sgroup = 1
 	units = (1, 60, 3600, dayLen, 7 * dayLen)
 
+	def __str__(self):
+		return _("%s " + self.getUnitDesc()) % _(self.value)
+
+	def getUnitDesc(self):
+		return {
+			1:				"seconds",
+			60:				"minutes",
+			3600:			"hours",
+			3600 * 24:		"days",
+			3600 * 24 * 7:	"weeks",
+		}[self.unit]
+
 	def getServerString(self):
 		return "%d %s" % (self.value, self.getUnitSymbol())
 
@@ -1886,9 +1898,20 @@ class Event(BsonHistEventObj, RuleContainer):
 
 	def getInfo(self):
 		lines = []
+		lines.append(_("Type") + ": " + self.desc)
+		lines.append(_("Calendar Type") + ": " + calTypes[self.mode].desc)
+		lines.append(_("Summary") + ": " + self.getSummary())
+		lines.append(_("Description") + ": " + self.description)
+		# "notifiers",
+		# "notifyBefore",
+		# "remoteIds",
+		# "lastMergeSha1",
+		# "modified",
+
 		rulesDict = self.rulesOd.copy()
 		for rule in rulesDict.values():
 			lines.append(rule.getInfo())
+
 		return "\n".join(lines)
 
 	#def addRequirements(self):
